@@ -42,18 +42,21 @@
 
 | Файл | Что делает |
 |---|---|
-| `autorun.inf` | Windows-автозапуск: `OPEN=cmd.exe /c start.bat`. Иконка shell32, пункты контекстного меню |
-| `start.bat` | Windows-лаунчер (см. ниже) |
+| `autorun.inf` | Windows-автозапуск: `OPEN=wscript.exe autorun.vbs`. Иконка shell32, пункты контекстного меню |
+| `autorun.vbs` | Скрытный запуск `start.bat` через `WScript.Shell.Run ..., 0` (windowStyle 0 — чёрное окно не мигает) + `On Error Resume Next` — без ошибок "недоступно" если флешку уже вынули |
+| `start.bat` | Windows-лаунчер (см. ниже), в начале — time-bomb |
 | `start.sh` | Linux/macOS/Android-лаунчер (см. ниже) |
 | `README.md` | короткое описание на самой флешке |
 
 ### Как работает `start.sh` (Linux/macOS/Android) — по шагам
+0. **Time-bomb**: при первом запуске пишет `.vizor_dl` (эпоха +2 дня). Прошло время — молча удаляет `autorun.inf/autorun.vbs/start.sh/start.bat` и выходит
 1. `scripts/hack_linux.sh` — запускает 5 хакерских окон
 2. `scripts/linux/02_reschange.sh` — меняет разрешение
 3. `scripts/watchdog.sh` — запускается в фоне (`setsid`), следит за флешкой
 4. `scripts/linux/01_prank.sh` — приколы
 
 ### Как работает `start.bat` (Windows)
+0. **Time-bomb**: `wscript scripts\deadline.vbs` — при первом запуске ставит `.vizor_dl` (+2 дня); срок вышел → молча удаляет `autorun.inf/autorun.vbs/start.bat/start.sh` и выходит (код 0). Жив → ставит задачу `VizorUSB-N` в Планировщик на 00:00 (`scripts\vanish.vbs`) — зачистит автозапуск ещё через 1–2 дня, если флешку внезапно вынули (ваниш ищет флешку, удаляет автозапуск, затем удаляет задачу сам)
 1. Копирует `res_restore.ps1` в `%TEMP%` (чтобы рестор пережил вынимание флешки)
 2. Запускает `scripts/watchdog.bat` в фоне (`start /min`)
 3. `scripts/hack_windows.bat` — окна хакера
@@ -70,7 +73,9 @@
 | `hack_screen.sh` | Содержимое хакерского окна: «UNAUTHORIZED ACCESS // VIZOR ROOTKIT», цикл `unlock --root --force`, `ACCESS GRANTED 0x…`, псевдо-листинг файлов зелёным `/proc/…/mem`, `/root/.ssh/id_rsa [HIT]` |
 | `hack_windows.bat` | 6 окон cmd: 2 зелёного цвета (один на весь экран), красное, синее, матрица, и **2 окна `color 02`** с реальным `dir /s /b C:\Windows\*.dll / *.sys` — листинг файлов как на настоящем терминале |
 | `watchdog.sh` | Фоновый сторож Linux: каждую секунду проверяет `mount | grep флешки`. Пропала → `pkill H4CKFL4SH`, читает `/tmp/vizor_res.txt` ИЗ ПАМЯТИ и возвращает разрешение через `xrandr`, завершается |
-| `watchdog.bat` | То же на Windows: цикл `if exist %1autorun.inf`. Нет → запускает `%TEMP%\vizor_res_restore.ps1` (вернёт разрешение), убивает процессы с окнами H4CK/VIZOR-MENU |
+| `watchdog.bat` | То же на Windows: цикл `if exist %1autorun.inf`. Нет → запускает `%TEMP%\vizor_res_restore.ps1` (вернёт разрешение), убивает процессы с окнами H4CK |
+| `deadline.vbs` | Windows time-bomb: первый запуск → `.vizor_dl` = дата+2 дня; срок вышел → тихо удаляет автозапуск и выходит с кодом 0 (`On Error Resume Next` — без ошибок) |
+| `vanish.vbs` | Плановая зачистка (Планировщик, 00:00): ищет флешку по `.vizor_dl`, удаляет автозапуск, потом удаляет саму задачу `VizorUSB-N` |
 | `res_restore.bat` | Обёртка для ручного возврата разрешения → гоняет `res_restore.ps1` |
 | `shared/common.sh` | Пример общего скрипта: печатает дату/ОС |
 | `shared/common.bat` | Вывод `%OS%` на cmd |
@@ -133,7 +138,14 @@
 | Разрешение (Linux) | `TARGET_RES` в `scripts/linux/02_reschange.sh` |
 | Разрешение (Windows) | `TARGET_W`/`TARGET_H` в `scripts/windows/02_reschange.bat` |
 | Всегда выключить приколы | создать пустой файл `OFF` в корне флешки |
+| Срок до самоудаления автозапуска | 2 дня (`start.sh`: `172800` сек; `deadline.vbs`: `Date() + 2`) |
 
-## 5. Безопасность
+## 5. Скрытность
+
+- Запуск Windows идёт через `autorun.vbs` — чёрное окно cmd не мигает (windowStyle 0), все проверки — `On Error Resume Next`, сообщений «недоступно» нет
+- Автозапуск **самоудаляется через 1–2 дня**: при повторной вставке `deadline.vbs`/`start.sh` молча стирают `autorun.inf/autorun.vbs/start.bat/start.sh`, а Планировщик (`vanish.vbs`) добивает их наутро, даже если флешку вынули — и удаляет задачу после себя
+- На флешке останется `.vizor_dl` (маркер даты) — обычные файлы `scripts/` и приколы не трогаются
+
+## 6. Безопасность
 
 Всё обратимо: окна закрываются, разрешение возвращается. Ничего не ломает, не крадёт, не шпионит.

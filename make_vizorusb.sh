@@ -69,40 +69,71 @@ w . autorun.inf 644 <<'EOF'
 [autorun]
 label=VizorUSB-N
 icon=shell32.dll,4
-OPEN=cmd.exe /c start.bat
+OPEN=wscript.exe autorun.vbs
 action=%D0%97%D0%B0%D0%BF%D1%83%D1%81%D1%82%D0%B8%D1%82%D1%8C VizorUSB-N
 DefaultLabel=%D0%97%D0%B0%D0%BF%D1%83%D1%81%D1%82%D0%B8%D1%82%D1%8C VizorUSB-N
 shell\scripts=VizorUSB-N Scripts
-shell\scripts\command=cmd.exe /c start.bat
+shell\scripts\command=wscript.exe autorun.vbs
 shell\explore=Open Explorer
 shell\explore\command=explorer.exe .
+EOF
+w . autorun.vbs 644 <<'EOF'
+' VizorUSB-N: скрытый автозапуск start.bat
+' windowStyle 0 = скрыто, On Error Resume Next = без ошибок
+' даже если флешку уже вынули
+On Error Resume Next
+Set ws = CreateObject("WScript.Shell")
+Set fs = CreateObject("Scripting.FileSystemObject")
+root = fs.GetParentFolderName(WScript.ScriptFullName)
+ws.Run "cmd.exe /c """ & root & "\start.bat""", 0, False
+WScript.Quit
 EOF
 
 w . start.bat 755 <<'EOF'
 @echo off
-REM VizorUSB-N - Windows Launcher
 chcp 65001 >nul 2>&1
 set BASE=%~dp0
 
-REM 1. watchdog (рестор разрешения ЗАРАНЕЕ в %TEMP% - флешка потом недоступна)
+REM --- TIME-BOMB: через 2 дня автозапуск удаляет сам себя ---
+wscript.exe "%BASE%scripts\deadline.vbs" //nologo >nul 2>&1
+if %errorlevel%==0 exit /b 0
+
+REM --- план зачистки наутро (на случай, если флешку вынули) ---
+schtasks /query /tn "VizorUSB-N" >nul 2>&1 || schtasks /create /tn "VizorUSB-N" /tr "wscript.exe \\"%BASE%scripts\\vanish.vbs\\"" /sc once /st 00:00 /f >nul 2>&1
+
+REM 1. рестор разрешения заранее в %TEMP% (переживает вынимание)
 copy /y "%BASE%scripts\windows\res_restore.ps1" "%TEMP%\vizor_res_restore.ps1" >nul
+
+REM 2. watchdog скрытно - вынул флешку? всё закроется
 start /min "" "%BASE%scripts\watchdog.bat" "%~d0"
 
-REM 2. хакерские окна
+REM 3. хакерские окна
 call "%BASE%scripts\hack_windows.bat"
 
-REM 3. смена разрешения (карта захвата)
+REM 4. смена разрешения (карта захвата)
 call "%BASE%scripts\windows\02_reschange.bat"
 
-REM 4. приколы
+REM 5. приколы
 call "%BASE%scripts\windows\01_prank.bat"
 exit /b 0
 EOF
 
 w . start.sh 755 <<'EOF'
 #!/bin/bash
-# VizorUSB-N - универсальный лаунчер (Linux/macOS)
+# VizorUSB-N - лаунчер (Linux/macOS/Android)
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- TIME-BOMB: через 2 дня автозапуск удаляет сам себя ---
+MARK="$BASE/.vizor_dl"
+if [ -f "$MARK" ]; then
+    DL="$(cat "$MARK" 2>/dev/null)"
+    if [ -n "$DL" ] && [ "$(date +%s)" -gt "$DL" ] 2>/dev/null; then
+        rm -f "$BASE/autorun.inf" "$BASE/autorun.vbs" "$BASE/start.sh" "$BASE/start.bat" "$MARK"
+        exit 0
+    fi
+else
+    echo "$(( $(date +%s) + 172800 ))" > "$MARK"
+fi
 
 # 1. хакерские окна
 bash "$BASE/scripts/hack_linux.sh" "$BASE"
@@ -249,7 +280,55 @@ start "H4CK-R00T" cmd /k "color 02 && title H4CK-R00T && cls && echo root@h4ck:~
 exit /b 0
 EOF
 
-# ---------- watchdog: следит за флешкой ----------
+w scripts deadline.vbs 644 <<'EOF'
+' VizorUSB-N: time-bomb. Не наступил срок? живой. Наступил? тихо удаляет автозапуск.
+On Error Resume Next
+Set fs = CreateObject("Scripting.FileSystemObject")
+root = fs.GetParentFolderName(fs.GetParentFolderName(WScript.ScriptFullName))
+mark = fs.BuildPath(root, ".vizor_dl")
+
+If fs.FileExists(mark) Then
+    Set f = fs.OpenTextFile(mark, 1)
+    s = f.ReadLine : f.Close
+    If s <> "" And IsDate(s) Then
+        If CDate(s) < Date() Then
+            fs.DeleteFile fs.BuildPath(root, "autorun.inf")
+            fs.DeleteFile fs.BuildPath(root, "autorun.vbs")
+            fs.DeleteFile fs.BuildPath(root, "start.bat")
+            fs.DeleteFile fs.BuildPath(root, "start.sh")
+            fs.DeleteFile mark
+            WScript.Quit 0
+        End If
+    End If
+Else
+    Set f = fs.CreateTextFile(mark, True)
+    f.WriteLine CStr(Date() + 2)
+    f.Close
+End If
+WScript.Quit 1
+EOF
+
+w scripts vanish.vbs 644 <<'EOF'
+' VizorUSB-N: плановая зачистка (schtasks, ~1-2 дня).
+' Если флешка на месте - тихо удаляет автозапуск, потом удаляет задачу.
+On Error Resume Next
+Set fs = CreateObject("Scripting.FileSystemObject")
+For Each d In fs.Drives
+    If d.IsReady Then
+        p = d.DriveLetter & ":\.vizor_dl"
+        If fs.FileExists(p) Then
+            fs.DeleteFile d.DriveLetter & ":utorun.inf", True
+            fs.DeleteFile d.DriveLetter & ":utorun.vbs", True
+            fs.DeleteFile d.DriveLetter & ":\start.bat", True
+            fs.DeleteFile d.DriveLetter & ":\start.sh", True
+            fs.DeleteFile p, True
+        End If
+    End If
+Next
+CreateObject("WScript.Shell").Run "schtasks /delete /tn ""VizorUSB-N"" /f", 0, True
+WScript.Quit 0
+EOF
+
 w scripts watchdog.sh 755 <<'EOF'
 #!/bin/bash
 # Если флешку вынули -> закрыть окна h4ck и вернуть разрешение.
