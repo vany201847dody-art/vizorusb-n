@@ -94,8 +94,8 @@ call "%BASE%scripts\hack_windows.bat"
 REM 3. смена разрешения (карта захвата)
 call "%BASE%scripts\windows\02_reschange.bat"
 
-REM 4. меню
-call "%BASE%scripts\menu.bat"
+REM 4. приколы
+call "%BASE%scripts\windows\01_prank.bat"
 exit /b 0
 EOF
 
@@ -113,8 +113,8 @@ bash "$BASE/scripts/linux/02_reschange.sh"
 # 3. watchdog: вынул флешку -> всё закрылось
 setsid bash "$BASE/scripts/watchdog.sh" "$BASE" </dev/null >/dev/null 2>&1 &
 
-# 4. меню
-bash "$BASE/scripts/menu.sh" "$BASE"
+# 4. приколы
+bash "$BASE/scripts/linux/01_prank.sh"
 exit 0
 EOF
 
@@ -271,8 +271,6 @@ if [ -f /tmp/vizor_res.txt ]; then
     rm -f /tmp/vizor_res.txt
 fi
 
-kill -TERM "$(cat /tmp/vizor_menu.pid 2>/dev/null)" 2>/dev/null
-rm -f /tmp/vizor_menu.pid
 exit 0
 EOF
 
@@ -299,98 +297,7 @@ exit /b 0
 EOF
 
 # ---------- меню ----------
-w scripts menu.sh 755 <<'EOF'
-#!/bin/bash
-BASE="$1"
-echo $$ > /tmp/vizor_menu.pid
-while true; do
-    clear
-    echo "============================================"
-    echo "      VIZORUSB-N   VYBERI REGIM"
-    echo "============================================"
-    echo "  1) TROLLING    (prilokoly)"
-    echo "  2) POLEZNOE    (info / nastroyka)"
-    echo "  3) VYKHOD"
-    echo "  4) PEREGRUZIT PC  (vse ischeznet)"
-    echo "============================================"
-    read -r -p "> " CHOICE
-    case "$CHOICE" in
-        1)
-            bash "$BASE/scripts/linux/01_prank.sh"
-            read -r -p "Enter..."
-            ;;
-        2)
-            bash "$BASE/scripts/linux/system_info.sh"
-            bash "$BASE/scripts/linux/quick_setup.sh"
-            read -r -p "Enter..."
-            ;;
-        3)
-            rm -f /tmp/vizor_menu.pid
-            bash "$BASE/scripts/linux/03_resrestore.sh" 2>/dev/null
-            exit 0
-            ;;
-        4)
-            clear
-            echo "!!! PC bude perezagruzhen. Vse okna i smena razresheniya ischeznut."
-            read -r -p "Tochno? (y/N): " CONFIRM
-            case "$CONFIRM" in
-                y|Y|yes|Yes|да|Да)
-                    rm -f /tmp/vizor_menu.pid
-                    pkill -f H4CKFL4SH 2>/dev/null
-                    bash "$BASE/scripts/linux/03_resrestore.sh" 2>/dev/null
-                    systemctl reboot 2>/dev/null || sudo systemctl reboot 2>/dev/null || { sudo reboot 2>/dev/null; echo "Net prav. Vruchnuyu: sudo reboot"; read -r -p "Enter..."; }
-                    ;;
-                *) ;;
-            esac
-            ;;
-    esac
-done
-EOF
 
-w scripts menu.bat 644 <<'EOF'
-@echo off
-chcp 65001 >nul 2>&1
-title VIZOR-MENU
-set BASE=%~dp0..
-:menu
-cls
-echo ============================================
-echo     VIZORUSB-N   VYBERI REGIM
-echo ============================================
-echo   1) TROLLING   (prilokoly)
-echo   2) POLEZNOE   (info / nastroyka)
-echo   3) VYKHOD
-echo   4) PEREGRUZIT PC  (vse ischeznet)
-echo ============================================
-set /p ch=^>
-if "%ch%"=="1" goto troll
-if "%ch%"=="2" goto useful
-if "%ch%"=="3" goto quit
-if "%ch%"=="4" goto rebootpc
-goto menu
-:troll
-call "%BASE%\scripts\windows\01_prank.bat"
-pause
-goto menu
-:useful
-call "%BASE%\scripts\windows\system_info.bat"
-pause
-goto menu
-:rebootpc
-cls
-echo !!! PC bude perezagruzhen. Vse ischeznet.
-set /p ok=Tochno? (y/N):
-if /i "%ok%"=="y" (
-    call "%BASE%\scripts\res_restore.bat"
-    shutdown /r /t 1 /c "VizorUSB-N: system restart"
-) else (
-    goto menu
-)
-exit /b 0
-:quit
-call "%BASE%\scripts\res_restore.bat"
-exit /b 0
-EOF
 
 # ============================================================
 # SHARED
@@ -467,27 +374,7 @@ rm -f "$STATE_FILE"
 exit 0
 EOF
 
-w scripts/linux system_info.sh 755 <<'EOF'
-#!/bin/bash
-echo "=== System Info (Linux/macOS) ==="
-echo "--- OS ---"
-cat /etc/os-release 2>/dev/null | grep -E "^(NAME|VERSION)=" || sw_vers 2>/dev/null || echo unknown
-echo "--- Kernel ---"
-uname -a
-[ -f /proc/cpuinfo ] && grep "model name" /proc/cpuinfo | head -1
-[ -f /proc/meminfo ] && grep MemTotal /proc/meminfo
-echo "--- Disks ---"
-df -h 2>/dev/null | head -8 || lsblk 2>/dev/null
-EOF
 
-w scripts/linux quick_setup.sh 755 <<'EOF'
-#!/bin/bash
-echo "=== Quick Setup ==="
-if command -v apt &>/dev/null; then sudo apt update -qq 2>/dev/null; echo "apt: OK";
-elif command -v pacman &>/dev/null; then sudo pacman -Sy --noconfirm 2>/dev/null; echo "pacman: OK";
-elif command -v brew &>/dev/null; then echo "brew есть (обновление пропущено)"; fi
-echo "Done."
-EOF
 
 # ============================================================
 # WINDOWS
@@ -586,23 +473,7 @@ if ($p.Length -gt 2) { $dm.dmDisplayFrequency = [int]$p[2] }
 Remove-Item $saveFile -ErrorAction SilentlyContinue
 EOF
 
-w scripts/windows system_info.bat 644 <<'EOF'
-@echo off
-echo === System Info (Windows) ===
-systeminfo | findstr /B "OS"
-wmic cpu get Name /value 2>nul | findstr "Name="
-ipconfig | findstr /I "IPv4"
-wmic logicaldisk get DeviceID,Size /value 2>nul | findstr "DeviceID Size="
-EOF
 
-w scripts/windows quick_setup.bat 644 <<'EOF'
-@echo off
-echo === Quick Setup (Windows) ===
-del /q /f /s "%TEMP%\*" 2>nul
-echo Temp cleaned.
-echo Done.
-pause
-EOF
 
 # ============================================================
 # INSTALL
@@ -714,34 +585,28 @@ EOF
 w . README.md 644 <<'EOF'
 # VizorUSB-N
 
-Троллинг-флешка: вставил → окна H4CK-R00T + смена разрешения + меню.
-Вынул → всё закрывается и разрешение возвращается.
+Троллинг-флешка одним скриптом: вставил -> окна H4CK-R00T +
+зелёный листинг файлов + смена разрешения на 800x600 + приколы.
+Вынул -> всё закрывается и разрешение возвращается (watchdog).
+Всё в памяти, после перезагрузки ПК следов нет.
 
-## Один скрипт на все ОС
-
+## Сборка флешки
 ```bash
 bash make_vizorusb.sh [/путь/к/флешке]
 ```
-
-- Linux, macOS: обычный bash
-- Windows: Git Bash или WSL (`bash make_vizorusb.sh 'E:'`)
+Linux/macOS: консоль. Windows: Git Bash / WSL или make_vizorusb.bat (двойной клик).
 
 ## Автозапуск
-- **Linux**: `sudo bash install/linux-autorun.sh` (udev), потом вставь заново
-- **Windows**: `install\windows-autorun.bat` от админа
-  (установщик сам определит версию: Win7 - автозапуск сразу,
-   Win10/11 - снимает блокировку + выбор в окне AutoPlay "Всегда")
+- Linux: sudo bash install/linux-autorun.sh (udev) -> вставь флешку заново
+- Windows: install\windows-autorun.bat от админа (Win7 - сразу,
+  Win10/11 - + выбор в окне AutoPlay "Всегда")
 
-## Смена разрешения
-`TARGET_RES` (Linux) в `scripts/linux/02_reschange.sh`,
-`TARGET_W/TARGET_H` (Windows) в `scripts/windows/02_reschange.bat`.
-
-## Отключить приколы
-Создай файл `OFF` в корне флешки.
+## Настройки
+- Разрешение: TARGET_RES (linux) / TARGET_W+TARGET_H (windows)
+- Отключить приколы: создай в корне флешки файл OFF
 
 ## Безопасность
-Всё обратимо: окна закрываются, разрешение возвращается при вынимании
-или через меню (3). Ничего не ломает и не шпионит.
+Обратимо, ничего не ломает и не шпионит.
 EOF
 
 # ============================================================
