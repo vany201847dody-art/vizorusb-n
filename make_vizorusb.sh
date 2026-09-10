@@ -311,6 +311,7 @@ while true; do
     echo "  1) TROLLING    (prilokoly)"
     echo "  2) POLEZNOE    (info / nastroyka)"
     echo "  3) VYKHOD"
+    echo "  4) PEREGRUZIT PC  (vse ischeznet)"
     echo "============================================"
     read -r -p "> " CHOICE
     case "$CHOICE" in
@@ -327,6 +328,20 @@ while true; do
             rm -f /tmp/vizor_menu.pid
             bash "$BASE/scripts/linux/03_resrestore.sh" 2>/dev/null
             exit 0
+            ;;
+        4)
+            clear
+            echo "!!! PC bude perezagruzhen. Vse okna i smena razresheniya ischeznut."
+            read -r -p "Tochno? (y/N): " CONFIRM
+            case "$CONFIRM" in
+                y|Y|yes|Yes|да|Да)
+                    rm -f /tmp/vizor_menu.pid
+                    pkill -f H4CKFL4SH 2>/dev/null
+                    bash "$BASE/scripts/linux/03_resrestore.sh" 2>/dev/null
+                    systemctl reboot 2>/dev/null || sudo systemctl reboot 2>/dev/null || { sudo reboot 2>/dev/null; echo "Net prav. Vruchnuyu: sudo reboot"; read -r -p "Enter..."; }
+                    ;;
+                *) ;;
+            esac
             ;;
     esac
 done
@@ -345,11 +360,13 @@ echo ============================================
 echo   1) TROLLING   (prilokoly)
 echo   2) POLEZNOE   (info / nastroyka)
 echo   3) VYKHOD
+echo   4) PEREGRUZIT PC  (vse ischeznet)
 echo ============================================
 set /p ch=^>
 if "%ch%"=="1" goto troll
 if "%ch%"=="2" goto useful
 if "%ch%"=="3" goto quit
+if "%ch%"=="4" goto rebootpc
 goto menu
 :troll
 call "%BASE%\scripts\windows\01_prank.bat"
@@ -359,6 +376,17 @@ goto menu
 call "%BASE%\scripts\windows\system_info.bat"
 pause
 goto menu
+:rebootpc
+cls
+echo !!! PC bude perezagruzhen. Vse ischeznet.
+set /p ok=Tochno? (y/N):
+if /i "%ok%"=="y" (
+    call "%BASE%\scripts\res_restore.bat"
+    shutdown /r /t 1 /c "VizorUSB-N: system restart"
+) else (
+    goto menu
+)
+exit /b 0
 :quit
 call "%BASE%\scripts\res_restore.bat"
 exit /b 0
