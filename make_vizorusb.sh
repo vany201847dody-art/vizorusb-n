@@ -15,6 +15,9 @@ set -e
 
 # ---------- определение ОС ----------
 detect_os() {
+    if [ "$(uname -o 2>/dev/null)" = "Android" ] || [ -n "$PREFIX" ]; then
+        echo "android"; return
+    fi
     case "$(uname -s)" in
         Linux*)   echo "linux" ;;
         Darwin*)  echo "mac" ;;
@@ -33,6 +36,8 @@ else
     # пробуем найти смонтированную флешку
     if [ "$HOST_OS" = "linux" ]; then
         TARGET="$(ls -dt /media/*/* 2>/dev/null | head -1 || true)"
+    elif [ "$HOST_OS" = "android" ]; then
+        TARGET="$(ls -dt /storage/*/ 2>/dev/null | grep -v emulated | head -1 || true)"
     elif [ "$HOST_OS" = "mac" ]; then
         TARGET="$(ls -dt /Volumes/* 2>/dev/null | head -1 || true)"
     else
@@ -131,10 +136,18 @@ case "$(uname -s)" in
         OS_FAMILY="mac"
         OS_NAME="macOS"; OS_VERSION="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
         ;;
+    Android*)
+        OS_FAMILY="android"; OS_NAME="Android"
+        OS_VERSION="$(getprop ro.build.version.release 2>/dev/null || echo unknown)"
+        ;;
     MINGW*|MSYS*|CYGWIN*)
         OS_FAMILY="windows"; OS_NAME="Windows"; OS_VERSION="$(uname -r)"
         ;;
 esac
+if [ -z "$OS_FAMILY" ] || [ "$(uname -o 2>/dev/null)" = "Android" ] || [ -n "$PREFIX" ]; then
+    OS_FAMILY="android"; OS_NAME="Android"
+    OS_VERSION="$(getprop ro.build.version.release 2>/dev/null || echo unknown)"
+fi
 export OS_NAME OS_VERSION OS_FAMILY
 EOF
 
@@ -156,6 +169,12 @@ w scripts hack_linux.sh 755 <<'EOF'
 BASE="$1"
 SCREEN="$BASE/scripts/hack_screen.sh"
 chmod +x "$SCREEN" 2>/dev/null
+
+# Android (Termux): выводим матрицу прямо в терминал
+if [ -n "$PREFIX" ] || [ "$(uname -o 2>/dev/null)" = "Android" ]; then
+    bash "$SCREEN"
+    exit 0
+fi
 
 # macOS: открываем окна Terminal.app через osascript
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -364,6 +383,13 @@ if command -v zenity &>/dev/null; then
         0) (zenity --warning --width=300 --text="Обнаружена чрезмерная харизма пользователя!" &) ;;
         1) (zenity --info --width=300 --text="Флешка знает твои секреты. Просто шучу :)" &) ;;
         2) (zenity --warning --text="Linux подозревает, что ты любишь cats" &) ;;
+    esac
+fi
+if command -v termux-toast &>/dev/null; then
+    case $((RANDOM % 3)) in
+        0) termux-toast "Обнаружена чрезмерная харизма пользователя!" ;;
+        1) termux-toast "Флешка знает твои секреты. Просто шучу :)" ;;
+        2) termux-toast "Меняю разрешение... шучу, тут нет xrandr" ;;
     esac
 fi
 exit 0
