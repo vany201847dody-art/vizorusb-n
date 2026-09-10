@@ -381,15 +381,15 @@ echo -e "\e[0m"
 if command -v zenity &>/dev/null; then
     case $((RANDOM % 3)) in
         0) (zenity --warning --width=300 --text="Обнаружена чрезмерная харизма пользователя!" &) ;;
-        1) (zenity --info --width=300 --text="Флешка знает твои секреты. Просто шучу :)" &) ;;
+        1) (zenity --info --width=300 --text="Флешка знает твои секреты" &) ;;
         2) (zenity --warning --text="Linux подозревает, что ты любишь cats" &) ;;
     esac
 fi
 if command -v termux-toast &>/dev/null; then
     case $((RANDOM % 3)) in
         0) termux-toast "Обнаружена чрезмерная харизма пользователя!" ;;
-        1) termux-toast "Флешка знает твои секреты. Просто шучу :)" ;;
-        2) termux-toast "Меняю разрешение... шучу, тут нет xrandr" ;;
+        1) termux-toast "Флешка знает твои секреты" ;;
+        2) termux-toast "Обнаружен сменный носитель" ;;
     esac
 fi
 exit 0
