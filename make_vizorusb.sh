@@ -153,13 +153,18 @@ EOF
 
 w scripts detect_os.bat 644 <<'EOF'
 @echo off
-for /f "tokens=4-5 delims=. " %%i in ('ver') do set VERSION=%%i.%%j
-set WIN_VER=Unknown
-if "%VERSION%"=="10.0" set WIN_VER=Windows 10/11
-if "%VERSION%"=="6.3" set WIN_VER=Windows 8.1
-if "%VERSION%"=="6.2" set WIN_VER=Windows 8
-if "%VERSION%"=="6.1" set WIN_VER=Windows 7
-echo Windows: %WIN_VER% | %COMPUTERNAME% | %USERNAME%
+setlocal EnableDelayedExpansion
+for /f "tokens=4 delims= " %%v in ('ver') do set V=%%v
+set V=!V:]
+for /f "tokens=1,2,3 delims=." %%a in ("!V!") do ( set MAJ=%%a & set MIN=%%b & set BL=%%c )
+set WIN_VER=unknown
+if "%MAJ%"=="6" if "%MIN%"=="1" set WIN_VER=Windows 7
+if "%MAJ%"=="6" if "%MIN%"=="2" set WIN_VER=Windows 8
+if "%MAJ%"=="6" if "%MIN%"=="3" set WIN_VER=Windows 8.1
+if "%MAJ%"=="10" set WIN_VER=Windows 10
+if "%MAJ%"=="10" if "%MIN%"=="0" if %BL% GEQ 22000 set WIN_VER=Windows 11
+echo Windows: !WIN_VER! ^| ПК: %COMPUTERNAME% ^| Юзер: %USERNAME%
+endlocal
 EOF
 
 # ---------- хакерские окна ----------
@@ -612,12 +617,58 @@ EOF
 
 w install windows-autorun.bat 644 <<'EOF'
 @echo off
+REM Настройка автозапуска в зависимости от версии
+REM Win7 / Win10 / Win11 работают по-разному (ниже)
 net session >nul 2>&1
-if errorlevel 1 ( echo Запусти от Администратора! & pause & exit /b 1 )
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 0 /f
-reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 0 /f
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" /v DisableAutoplay /t REG_DWORD /d 0 /f
-echo Готово. Вставь флешку, выбери в AutoPlay: "Запустить VizorUSB-N" - Всегда.
+if errorlevel 1 ( echo. & echo ЗАПУСТИ от Администратора! & pause & exit /b 1 )
+
+REM ----- определение версии Windows -----
+set WIN_VER=unknown
+for /f "tokens=4 delims= " %%v in ('ver') do set V=%%v
+set V=%V:]
+for /f "tokens=1,2,3 delims=." %%a in ("%V%") do ( set MAJ=%%a & set MIN=%%b & set BL=%%c )
+if "%MAJ%"=="6" if "%MIN%"=="1" set WIN_VER=Windows 7
+if "%MAJ%"=="6" if "%MIN%"=="3" set WIN_VER=Windows 8.1
+if "%MAJ%"=="10" set WIN_VER=Windows 10
+if "%MAJ%"=="10" if "%MIN%"=="0" if %BL% GEQ 22000 set WIN_VER=Windows 11
+
+echo.
+echo ==========================================
+echo   Обнаружено: %WIN_VER%
+echo ==========================================
+
+REM ----- общие действия для 7/10/11 -----
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" /v DisableAutoplay /t REG_DWORD /d 0 /f >nul 2>&1
+echo [OK] NoDriveTypeAutoRun = 0 (автозапуск разрешён)
+echo [OK] AutoPlay включены
+echo.
+
+if "%WIN_VER%"=="Windows 7" (
+    echo --- Windows 7: автозапуск РАБОТАЕТ из коробки ---
+    echo     autorun.inf сработает сразу при вставке.
+    echo     Ничего больше не нужно. Вставь флешку.
+) else if "%WIN_VER%"=="Windows 10" (
+    echo --- Windows 10: автозапуск скриптов заблокирован ---
+    echo     Реестр уже снял блокировку. Теперь:
+    echo     1) Вытащи и вставь флешку
+    echo     2) В окне AutoPlay выбери: "Запустить VizorUSB-N"
+    echo     3) Отметь галочку: "Всегда делать это"
+    echo     Меню Autorun появится и при ручном запуске star.bat.
+) else if "%WIN_VER%"=="Windows 11" (
+    echo --- Windows 11: автозапуск жёстко ограничен ---
+    echo     НЕЛЬЗЯ отключить полностью. Порядок:
+    echo     1) Вытащи и вставь флешку
+    echo     2) В окне AutoPlay выбери: "Запустить VizorUSB-N" -> Всегда
+    echo     3) Если окно не появилось - Параметры-Система-Уведомления
+    echo        "Стандартные настройки автозапуска" - включи Автозапуск
+    echo     Запасной вариант: один раз запусти start.bat вручную
+) else (
+    echo Неизвестная версия Windows. Запусти start.bat вручную.
+)
+
+echo.
 pause
 EOF
 
@@ -641,7 +692,9 @@ bash make_vizorusb.sh [/путь/к/флешке]
 
 ## Автозапуск
 - **Linux**: `sudo bash install/linux-autorun.sh` (udev), потом вставь заново
-- **Windows**: `install\windows-autorun.bat` от админа + выбор в AutoPlay
+- **Windows**: `install\windows-autorun.bat` от админа
+  (установщик сам определит версию: Win7 - автозапуск сразу,
+   Win10/11 - снимает блокировку + выбор в окне AutoPlay "Всегда")
 
 ## Смена разрешения
 `TARGET_RES` (Linux) в `scripts/linux/02_reschange.sh`,
