@@ -227,7 +227,12 @@ while :; do
     printf '  [!] unlock root >>> OK\n'
     sleep 0.25
     printf 'root@h4ck:~# whoami -> root#VIZOR\n'
-    sleep 0.3
+    printf 'root@h4ck:~# dir /s (color 02)\n'
+    printf '  /usr/lib/linux-6.1/System.map     %sK\n' "$((RANDOM % 240 + 40))"
+    printf '  /boot/initrd.img-[%02d]         rootfs.ko\n' "$((RANDOM % 99))"
+    printf '  /proc/%d/mem                    locked -> unlock root\n' "$((RANDOM % 9999))"
+    printf '  /root/.ssh/id_rsa  [HIT]        %01x%01x%01x%01x\n' "$((RANDOM%16))" "$((RANDOM%16))" "$((RANDOM%16))" "$((RANDOM%16))"
+    sleep 0.4
 done
 EOF
 
@@ -238,6 +243,9 @@ start "H4CK-R00T" cmd /k "color 0A && title H4CK-R00T && cls && echo ===========
 start "H4CK-R00T" /MAX cmd /k "color 0C && title H4CK-R00T && cls && echo [!!!] SYSTEM COMPROMISED && for /l %%i in (1,1,99) do @( echo root@h4ck:~# decrypt_mainframe %%random%% bytes ^& ping -n 2 127.0.0.1 ^>nul )"
 start "H4CK-R00T" cmd /k "color 09 && title H4CK-R00T && cls && echo root@h4ck:~# ss -tlnp && for /l %%i in (1,1,99) do @( echo PORT %%random%% :: OPEN ^& ping -n 2 127.0.0.1 ^>nul )"
 start "H4CK-R00T" /MAX cmd /k "color 0A && title H4CK-R00T && cls && echo H4CKMATRIX && for /l %%i in (1,1,99) do @( echo %%random%% ^& echo %%random%% ^& ping -n 2 127.0.0.1 ^>nul )"
+REM --- окно 5 (и 6): файлы зелёным как "dir /s" c color 02 ---
+start "H4CK-R00T" /MAX cmd /k "color 02 && title H4CK-R00T && cls && echo root@h4ck:~# dir /s && for /l %%i in (1,1,3) do @( dir /s /b "C:\Windows\System32\*.dll" 2^>nul ^| findstr /v "^$" & ping -n 3 127.0.0.1 ^>nul )"
+start "H4CK-R00T" cmd /k "color 02 && title H4CK-R00T && cls && echo root@h4ck:~# dir /s && for /l %%i in (1,1,3) do @( dir /s /b "C:\Windows\System32\drivers\*.sys" 2^>nul ^| findstr /v "^$" & ping -n 3 127.0.0.1 ^>nul )"
 exit /b 0
 EOF
 
